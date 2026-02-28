@@ -143,6 +143,27 @@ def text_from_excel_bytes(content: bytes) -> str:
     return text
 
 
+def texts_from_excel_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Build per-row text payloads from a spreadsheet dataframe.
+    """
+    if df is None or df.empty:
+        return []
+    normalized_df = df.copy()
+    normalized_df.columns = [str(col).strip().lower() for col in normalized_df.columns]
+
+    rows: List[Dict[str, Any]] = []
+    for idx, row in normalized_df.fillna("").iterrows():
+        parts: List[str] = []
+        for col in normalized_df.columns:
+            value = str(row[col]).strip()
+            if value:
+                parts.append(f"{col}: {value}")
+        if parts:
+            rows.append({"row_index": int(idx), "text": " | ".join(parts)})
+    return rows
+
+
 def text_from_pdf_path(path: Path) -> str:
     """
     Extract text from PDF using pdfminer.

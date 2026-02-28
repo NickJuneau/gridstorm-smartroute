@@ -6,6 +6,7 @@ import ResultCard from "@/components/ResultCard";
 import SampleSelector from "@/components/SampleSelector";
 import Toast from "@/components/Toast";
 import { AnalyzeApiError, AnalyzeResult } from "@/types/analyze";
+import { downloadJson } from "@/utils/download";
 import { normalizeAnalyzeResult } from "@/utils/normalize";
 
 type HistoryItem = {
@@ -24,15 +25,9 @@ const HISTORY_KEY = "smartroute-history-v1";
 
 function urgencyDotClass(urgency: string): string {
   const value = urgency.toLowerCase();
-  if (value === "emergency") {
-    return "bg-danger";
-  }
-  if (value === "high") {
-    return "bg-orange-500";
-  }
-  if (value === "medium") {
-    return "bg-warn";
-  }
+  if (value === "emergency") return "bg-danger";
+  if (value === "high") return "bg-orange-500";
+  if (value === "medium") return "bg-warn";
   return "bg-ok";
 }
 
@@ -48,20 +43,17 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileResults, setFileResults] = useState<AnalyzeResult[]>([]);
+  const [selectedFileResultIndex, setSelectedFileResultIndex] = useState(0);
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(HISTORY_KEY);
-      if (!raw) {
-        return;
-      }
+      if (!raw) return;
       const parsed = JSON.parse(raw) as HistoryItem[];
-      if (Array.isArray(parsed)) {
-        setHistory(parsed.slice(0, 5));
-      }
+      if (Array.isArray(parsed)) setHistory(parsed.slice(0, 5));
     } catch {
-      // Ignore localStorage parse failures.
+      // ignore
     }
   }, []);
 
@@ -79,37 +71,31 @@ export default function HomePage() {
     setHistory((prev) => [item, ...prev].slice(0, 5));
   };
 
-  const clearTransientError = () => {
-    setError(null);
-  };
+  const clearTransientError = () => setError(null);
 
   const handleAnalyze = async (event: FormEvent) => {
     event.preventDefault();
     clearTransientError();
 
     if (!text.trim()) {
-      setError("Please enter or upload email text before analyzing.");
-      setToast({ message: "Please enter text before analyzing.", type: "error" });
+      const message = "Please enter or upload email text before analyzing.";
+      setError(message);
+      setToast({ message, type: "error" });
       return;
     }
 
     setIsLoading(true);
-
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
       });
-
       const payload = (await response.json()) as AnalyzeResult | AnalyzeApiError;
       if (!response.ok) {
         const message = "error" in payload ? payload.error : "Unable to complete analysis right now.";
         throw new Error(message);
       }
-
       const normalized = normalizeAnalyzeResult(payload);
       setResult(normalized);
       appendHistory(text, normalized);
@@ -125,17 +111,13 @@ export default function HomePage() {
 
   const handleUploadText = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
+    if (!file) return;
     if (file.type !== "text/plain" && !file.name.toLowerCase().endsWith(".txt")) {
       const message = "Only .txt files are supported for direct textarea insert.";
       setError(message);
       setToast({ message, type: "error" });
       return;
     }
-
     const fileText = await file.text();
     setText(fileText);
     clearTransientError();
@@ -144,21 +126,19 @@ export default function HomePage() {
   const handleClear = () => {
     setText("");
     setResult(null);
+    setFileResults([]);
+    setSelectedFileResultIndex(0);
     clearTransientError();
   };
 
   const historyPills = useMemo(
     () =>
-      history.map((item) => {
-        const urgency = item.result.interpretation?.urgency ?? "low";
-        const route = item.result.routing?.team ?? "Field Services";
-        return {
-          ...item,
-          urgency,
-          route,
-          shortId: shortId(item.result, item.id)
-        };
-      }),
+      history.map((item) => ({
+        ...item,
+        urgency: item.result.interpretation?.urgency ?? "low",
+        route: item.result.routing?.team ?? "Field Services",
+        shortId: shortId(item.result, item.id)
+      })),
     [history]
   );
 
@@ -169,14 +149,10 @@ export default function HomePage() {
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">SmartRoute Analyzer</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Parse inspector emails, classify urgency, and get routing recommendations instantly.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Parse inspector emails, classify urgency, and get routing recommendations instantly.</p>
 
           <form onSubmit={handleAnalyze} suppressHydrationWarning className="mt-5 space-y-4">
-            <label htmlFor="email-body" className="label-muted block">
-              Inspector Email Input
-            </label>
+            <label htmlFor="email-body" className="label-muted block">Inspector Email Input</label>
             <textarea
               id="email-body"
               value={text}
@@ -187,9 +163,7 @@ export default function HomePage() {
               placeholder="Paste inspector email text here..."
               aria-describedby="email-help"
             />
-            <p id="email-help" className="text-xs text-slate-500">
-              Supports plain text field notes and copied email content.
-            </p>
+            <p id="email-help" className="text-xs text-slate-500">Supports plain text field notes and copied email content.</p>
 
             <div className="flex flex-wrap gap-2">
               <button
@@ -213,9 +187,7 @@ export default function HomePage() {
             <SampleSelector onInsert={setText} />
 
             <div className="rounded-lg border border-dashed border-slate-300 p-3">
-              <label htmlFor="txt-upload" className="label-muted block">
-                Quick .txt to textarea (optional)
-              </label>
+              <label htmlFor="txt-upload" className="label-muted block">Quick .txt to textarea (optional)</label>
               <input
                 id="txt-upload"
                 type="file"
@@ -226,26 +198,72 @@ export default function HomePage() {
             </div>
 
             <FileUploader
-              onSelect={setSelectedFile}
-              existingFile={selectedFile}
               onError={(message) => setError(message || null)}
-              onToast={(message, type = "success") => setToast({ message, type })}
-              onFileAnalyzed={(uploadedResult) => {
-                setResult(uploadedResult);
-                clearTransientError();
-                appendHistory(uploadedResult.raw_text || "[uploaded file]", uploadedResult);
+              onFileResults={(results) => {
+                setFileResults(results);
+                setSelectedFileResultIndex(0);
+                const first = results[0] ?? null;
+                setResult(first);
+                if (first) {
+                  appendHistory(first.raw_text || "[uploaded file]", first);
+                }
               }}
             />
           </form>
 
-          {error ? (
-            <div className="mt-4 rounded-md border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </div>
-          ) : null}
+          {error ? <div className="mt-4 rounded-md border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">{error}</div> : null}
         </div>
 
-        <ResultCard result={result} onToast={(message, type = "success") => setToast({ message, type })} />
+        <div className="space-y-4">
+          {fileResults.length ? (
+            <section className="card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Uploaded Rows</h3>
+                <button
+                  type="button"
+                  aria-label="Export all upload results JSON"
+                  onClick={() => downloadJson("upload-results.json", fileResults)}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Export All JSON
+                </button>
+              </div>
+              <div className="max-h-64 space-y-2 overflow-auto">
+                {fileResults.map((item, index) => {
+                  const permit = (item.extracted.permit_number || item.extracted.permit || "-").toString();
+                  const urgency = item.interpretation?.urgency || "low";
+                  const confidencePct = Math.round((item.interpretation?.confidence ?? 0.8) * 100);
+                  const rowIndex = Number(item.metadata?.row_index ?? index);
+                  return (
+                    <button
+                      key={`${rowIndex}-${item.message_id || index}`}
+                      type="button"
+                      aria-label={`Select uploaded result row ${rowIndex}`}
+                      onClick={() => {
+                        setSelectedFileResultIndex(index);
+                        setResult(item);
+                      }}
+                      className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                        selectedFileResultIndex === index
+                          ? "border-primary bg-primary/5"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-800">#{rowIndex}</span>
+                        <span className="text-slate-700">{permit}</span>
+                        <span className={`h-2 w-2 rounded-full ${urgencyDotClass(urgency)}`} />
+                        <span className="text-xs text-slate-500">{confidencePct}%</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <ResultCard result={result} onToast={(message, type = "success") => setToast({ message, type })} />
+        </div>
       </section>
 
       <section className="card p-6">

@@ -38,6 +38,7 @@ export type AnalyzeResult = {
     processing_time_ms: number;
     timestamp: string;
     source: string;
+    row_index?: number;
     file?: {
       filename?: string;
       size_bytes?: number;

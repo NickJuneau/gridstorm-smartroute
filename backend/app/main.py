@@ -1,12 +1,14 @@
 import logging
 import csv
 import json
+import io
 import os
 import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List
 
+import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -16,7 +18,7 @@ from app import pipeline
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("smartroute.main")
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
-ALLOWED_EXTENSIONS = {".txt", ".pdf", ".xlsx"}
+ALLOWED_EXTENSIONS = {".txt", ".pdf", ".xls", ".xlsx"}
 ALLOWED_CONTENT_TYPES = {
     "text/plain",
     "application/pdf",
@@ -201,12 +203,12 @@ def _corrections_csv_path() -> Path:
     return Path(__file__).resolve().parent / "data" / "human_corrections.csv"
 
 
-@app.post("/analyze-file", response_model=AnalyzeResponse)
+@app.post("/analyze-file")
 async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     file_name = file.filename or "upload"
     ext = _extension(file_name)
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=415, detail="Unsupported file type. Allowed: .txt, .pdf, .xlsx.")
+        raise HTTPException(status_code=415, detail="Unsupported file type. Allowed: .txt, .pdf, .xls, .xlsx.")
     if (file.content_type or "") not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail=f"Unsupported content type: {file.content_type}")
 
@@ -219,28 +221,46 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             mocked = _fallback_analyze(f"[mock upload] {file_name}")
             mocked.setdefault("metadata", {})
             mocked["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
-            return mocked
+            return {"file": {"filename": file_name, "size_bytes": size_bytes}, "results": [mocked]}
 
-        extracted_text = ""
+        results: List[Dict[str, Any]] = []
         if ext == ".txt":
             try:
                 extracted_text = raw.decode("utf-8")
             except UnicodeDecodeError:
                 extracted_text = raw.decode("cp1252", errors="ignore")
             logger.info("File extractor used: txt")
-        elif ext == ".xlsx":
+            analyzed = pipeline.analyze_text(extracted_text)
+            analyzed.setdefault("metadata", {})
+            analyzed["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
+            results.append(analyzed)
+        elif ext in {".xls", ".xlsx"}:
             try:
-                extracted_text = pipeline.text_from_excel_bytes(raw)
+                frame = pd.read_excel(io.BytesIO(raw))
             except Exception as exc:
                 raise HTTPException(status_code=422, detail=f"Failed to parse Excel file: {exc}") from exc
+            row_payloads = pipeline.texts_from_excel_df(frame)
+            for row_payload in row_payloads:
+                analyzed = pipeline.analyze_text(row_payload["text"])
+                analyzed.setdefault("metadata", {})
+                analyzed["metadata"]["row_index"] = int(row_payload["row_index"])
+                analyzed["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
+                results.append(analyzed)
+            logger.info("File extractor used: excel rows=%s", len(results))
         elif ext == ".pdf":
             if not pipeline.PDFMINER_AVAILABLE:
-                raise HTTPException(status_code=422, detail="pdfminer not installed. Run pip install pdfminer.six")
+                raise HTTPException(status_code=422, detail="pdfminer not installed. pip install pdfminer.six")
             temp_dir = tempfile.mkdtemp(prefix="smartroute_pdf_")
             temp_path = Path(temp_dir) / "upload.pdf"
             try:
                 temp_path.write_bytes(raw)
-                extracted_text = pipeline.text_from_pdf_path(temp_path)
+                try:
+                    extracted_text = pipeline.text_from_pdf_path(temp_path)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Failed to extract PDF text. Ensure pdfminer.six is installed and PDF is text-based: {exc}",
+                    ) from exc
             finally:
                 try:
                     temp_path.unlink(missing_ok=True)
@@ -250,14 +270,16 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                     Path(temp_dir).rmdir()
                 except Exception:
                     pass
+            if not extracted_text.strip():
+                raise HTTPException(status_code=422, detail="Uploaded file did not contain extractable text.")
+            analyzed = pipeline.analyze_text(extracted_text)
+            analyzed.setdefault("metadata", {})
+            analyzed["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
+            results.append(analyzed)
 
-        if not extracted_text.strip():
-            raise HTTPException(status_code=422, detail="Uploaded file did not contain extractable text.")
-
-        result = pipeline.analyze_text(extracted_text)
-        result.setdefault("metadata", {})
-        result["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
-        return result
+        if not results:
+            raise HTTPException(status_code=422, detail="No analyzable records found in uploaded file.")
+        return {"file": {"filename": file_name, "size_bytes": size_bytes}, "results": results}
     except HTTPException:
         raise
     except Exception as exc:
