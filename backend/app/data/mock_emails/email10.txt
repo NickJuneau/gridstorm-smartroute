@@ -1,0 +1,8 @@
+Subject: Inspection notice #993311
+Address: 18 Lake View Dr
+Inspection Type: Electrical
+Result: Failed
+Inspection Date: 2026-02-08
+Inspector: Omar Li
+Phone: 555-340-1111
+Notes: Transformer humming loudly and oil residue visible.

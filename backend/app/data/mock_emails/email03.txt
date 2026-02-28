@@ -1,0 +1,11 @@
+Forwarded message
+From: fieldops@county.org
+To: centraldesk@routeiq.local
+CC: records@routeiq.local
+Subject: Permit approval narrative
+
+The permit #PMT-99810 has been reviewed for Pole 778120 at 700 Pine St.
+Inspection result approved after documentation update.
+Inspector: Morgan Thomas
+Contact: Morgan Thomas
+Phone: +1 555 019 6644

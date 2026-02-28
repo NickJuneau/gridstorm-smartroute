@@ -1,0 +1,11 @@
+Subject: Gas Odor Complaint - Ticket #102934
+Permit No: GAS-22014
+Address: 55 Harbor Lane
+Inspection Type: Gas Leak Verification
+Result: Failed
+Inspection Date: 2026/02/10
+Inspector: Dee Patel
+Contact Name: Dee Patel
+Phone: 555.730.8812
+Email: dpatel@safetygrid.net
+Notes: Strong odor reported near meter enclosure.

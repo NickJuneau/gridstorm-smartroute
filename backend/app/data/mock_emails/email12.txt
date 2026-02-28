@@ -1,0 +1,10 @@
+Subject: ASAP vegetation hazard
+Pole ID: 991122
+Site Address: 212 Birch Lane
+Inspection Type: Vegetation Encroachment
+Result: Failed
+Inspection Date: 2026-02-07
+Inspector: Ben Ortiz
+Phone: 555-651-9001
+Email: bortiz@greenscan.io
+Notes: Branches contacting primary line. ASAP trimming needed.

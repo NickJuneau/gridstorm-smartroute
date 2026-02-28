@@ -1,0 +1,10 @@
+Subject: URGENT - downed line near school
+Inspection Date: 02/14/2026
+Pole ID: 483220
+Site Address: 301 Cedar Road
+Inspection Type: Electrical Incident
+Result: Failed
+Inspector: L. Chen
+Phone: (555) 111-9200
+Email: lchen@utilitywatch.com
+Notes: Live wire sparking after storm. Immediate hazard. Keep public away.

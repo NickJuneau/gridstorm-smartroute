@@ -1,0 +1,10 @@
+Subject: Tree clearance complete
+Permit Number: PMT-22002
+Address: 1400 Willow Ln
+Inspection Type: Vegetation Encroachment
+Result: Approved
+Inspection Date: 2026-01-27
+Inspector: J. Doe
+Phone: 555-000-8899
+Email: jdoe@arborcheck.com
+Notes: Clearance complete and verified.

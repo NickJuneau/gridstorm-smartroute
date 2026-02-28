@@ -1,0 +1,9 @@
+issue_type,team,method
+transformer,Electrical Operations,electrical_queue
+electrical,Electrical Operations,electrical_queue
+gas,Gas Operations,gas_queue
+vehicle,Field Services,field_queue
+vegetation,Vegetation Management,vegetation_queue
+permit,Records,records_queue
+emergency,Emergency,emergency_dispatch
+default,Field Services,field_queue

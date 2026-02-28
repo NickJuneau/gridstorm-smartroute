@@ -1,0 +1,9 @@
+From: notices@township.gov
+Subject: Permit #PMT-33551 closed
+Address: 77 King Street
+Inspection Type: Permit Documentation
+Result: Approved
+Inspector: Priya Shaw
+Phone: 555-112-4433
+Email: pshaw@township.gov
+Notes: Records complete.

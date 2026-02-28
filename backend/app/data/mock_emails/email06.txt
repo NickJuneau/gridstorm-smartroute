@@ -1,0 +1,9 @@
+Subject: Vehicle impact at pole #625444
+Date: 2026-02-13
+Site Address: 91 North Street
+Inspection Type: Field Damage Assessment
+Result: Failed
+Inspector: Raul Mendez
+Phone: 555-808-5566
+Email: rmendez@fieldops.net
+Description: Delivery truck struck pole. Cracked base and leaning 7 degrees.

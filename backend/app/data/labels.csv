@@ -1,0 +1,9 @@
+file,pole_id,permit,address,inspection_type,ground_truth_team
+email01.txt,625296,PMT-77431,1458 Riverbend Ave,Electrical Safety Inspection,Electrical Operations
+email02.txt,,PMT-88211,22 Oak Meadow Dr,Vegetation Encroachment,Vegetation Management
+email03.txt,778120,PMT-99810,700 Pine St,Permit Reconciliation,Records
+email04.txt,483220,,301 Cedar Road,Electrical Incident,Emergency
+email05.txt,,GAS-22014,55 Harbor Lane,Gas Leak Verification,Gas Operations
+email06.txt,625444,,91 North Street,Field Damage Assessment,Field Services
+email12.txt,991122,,212 Birch Lane,Vegetation Encroachment,Vegetation Management
+email17.txt,,PMT-77755,29 Maple Ct,Permit Review,Records

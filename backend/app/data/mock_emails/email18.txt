@@ -1,0 +1,10 @@
+Subject: Transformer replacement recommendation
+Pole ID: 350020
+Site Address: 911 Ridge Avenue
+Inspection Type: Electrical Safety Inspection
+Result: Failed
+Inspection Date: 2026-01-28
+Inspector: Peter Hall
+Phone: 555-919-8112
+Email: phall@inspectpro.com
+Description: Transformer leaking, audible buzzing, immediate review requested.

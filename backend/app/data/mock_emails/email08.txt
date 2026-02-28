@@ -1,0 +1,11 @@
+Subject: Spreadsheet row import
+Permit #: PMT-67312
+Site Address: 900 Willow Court
+Inspection Type: Vegetation
+Result: Failed
+Inspection Date: 2026-02-09
+Inspector: Samir Khan
+Contact Name: Samir Khan
+Phone: (555) 700-8832
+e-mail: skhan@arborcheck.com
+Notes: Overgrowth around transformer enclosure.

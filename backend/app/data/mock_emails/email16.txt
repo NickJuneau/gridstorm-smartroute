@@ -1,0 +1,9 @@
+Subject: Pole strike and outage report
+Pole # 870456
+Site Address: 81 Harbor Boulevard
+Inspection Type: Vehicle Incident
+Result: Failed
+Inspector: David Kim
+Phone: 555-775-3030
+Email: dkim@responsewatch.net
+Notes: Utility pole hit by sedan; outage in nearby block.

@@ -1,0 +1,11 @@
+CAUTION! External email warning
+Subject: Records cleanup request
+Permit Number: PMT-12340
+Address: 12 Center Ave
+Inspection Type: Permit Reconciliation
+Result: Approved
+Inspection Date: 2026-02-11
+Inspector: Keira Holt
+Phone: 555-401-7755
+Email: kholt@recordsdesk.org
+Notes: Missing attached signatures corrected in portal.

@@ -1,0 +1,9 @@
+Subject: Emergency - on fire near pole
+Pole: 700991
+Address: 66 Brook Way
+Inspection Type: Electrical Emergency
+Result: Failed
+Inspector: Theo Miles
+Phone: 555-120-9898
+Email: tmiles@rapidinspect.com
+Notes: Small fire at transformer base. Fire crew notified.

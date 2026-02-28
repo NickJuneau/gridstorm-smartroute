@@ -1,0 +1,22 @@
+From: Utility Portal <noreply@gridcity.gov>
+Sent: Tuesday, February 18, 2026 9:05 AM
+To: dispatch@routeiq.local
+Subject: CAUTION! External Email - Inspection Alert #625296
+
+CAUTION! This email originated outside the organization.
+PhishAlarm: Click here to report suspicious email.
+
+Permit Number: PMT-77431
+Site Address: 1458 Riverbend Ave
+Inspection Type: Electrical Safety Inspection
+Result: Failed
+Inspection Date: 2026-02-17
+Inspector: Alex Rivera
+Contact Name: Alex Rivera
+Phone: (555) 310-7788
+e-Mail: alex.rivera@inspectpro.com
+Notes: Transformer leak observed near sidewalk. Urgent dispatch requested.
+
+Respectfully,
+Alex Rivera
+http://long-signature-link.example.com/profile/alex/inspector/details

@@ -1,0 +1,10 @@
+Subject: Routine gas check
+Permit Number: GAS-90872
+Address: 500 Ridge Rd
+Inspection Type: Gas Routine Check
+Result: Approved
+Inspection Date: 2026-02-01
+Inspector: Yara Noor
+Phone: 555-445-0099
+Email: ynoor@gasinspect.io
+Notes: No leaks detected.
