@@ -5,8 +5,5 @@ pandas
 python-multipart
 openpyxl
 pdfminer.six
-pdf2image
-pytesseract
-Pillow
 spacy
 pytest

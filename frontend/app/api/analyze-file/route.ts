@@ -3,12 +3,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".pdf", ".xlsx"];
 
 function getAnalyzeFileEndpoint(): string {
-  const direct = process.env.BACKEND_URL_FILE?.trim();
-  if (direct) {
-    return direct;
-  }
-  const backend = process.env.BACKEND_URL?.trim() || "http://localhost:8000";
-  return `${backend.replace(/\/+$/, "")}/analyze-file`;
+  return process.env.BACKEND_URL_FILE?.trim() || "http://localhost:8000/analyze-file";
 }
 
 function buildMockAnalyzeResult(fileName: string, fileSize: number) {
@@ -95,23 +90,18 @@ export async function POST(request: Request) {
       cache: "no-store"
     });
 
-    const contentType = upstream.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json")) {
-      const payload = await upstream.json();
-      if (!upstream.ok) {
-        return NextResponse.json(
-          { detail: payload?.detail ?? payload?.error ?? "File analyze request failed." },
-          { status: upstream.status }
-        );
-      }
-      return NextResponse.json(payload, { status: 200 });
-    }
-
     const text = await upstream.text();
-    if (!upstream.ok) {
-      return NextResponse.json({ detail: text || "File analyze request failed." }, { status: upstream.status });
+    let payload: unknown = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = { detail: text || "File analyze request failed." };
     }
-    return NextResponse.json({ detail: text }, { status: 200 });
+    if (!upstream.ok) {
+      const detail = (payload as any)?.detail ?? (payload as any)?.error ?? "File analyze request failed.";
+      return NextResponse.json({ detail }, { status: upstream.status });
+    }
+    return NextResponse.json(payload, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown analyze-file proxy error.";
     return NextResponse.json({ detail: `Unable to process upload: ${message}` }, { status: 502 });

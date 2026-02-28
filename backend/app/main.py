@@ -234,27 +234,13 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             except Exception as exc:
                 raise HTTPException(status_code=422, detail=f"Failed to parse Excel file: {exc}") from exc
         elif ext == ".pdf":
+            if not pipeline.PDFMINER_AVAILABLE:
+                raise HTTPException(status_code=422, detail="pdfminer not installed. Run pip install pdfminer.six")
             temp_dir = tempfile.mkdtemp(prefix="smartroute_pdf_")
             temp_path = Path(temp_dir) / "upload.pdf"
             try:
                 temp_path.write_bytes(raw)
-                try:
-                    extracted_text = pipeline.text_from_pdf_path(temp_path)
-                except Exception as exc:
-                    logger.info("pdfminer extraction failed: %s", exc)
-                    extracted_text = ""
-                if len(extracted_text.strip()) < 120:
-                    ocr_text = pipeline.ocr_pdf(temp_path)
-                    if ocr_text.strip():
-                        extracted_text = ocr_text
-                    elif not extracted_text.strip():
-                        raise HTTPException(
-                            status_code=422,
-                            detail={
-                                "message": "Could not extract text from PDF. OCR fallback unavailable or failed.",
-                                "install_tesseract": True,
-                            },
-                        )
+                extracted_text = pipeline.text_from_pdf_path(temp_path)
             finally:
                 try:
                     temp_path.unlink(missing_ok=True)

@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
-from pdfminer.high_level import extract_text as pdfminer_extract_text
+try:
+    from pdfminer.high_level import extract_text as pdfminer_extract_text
+
+    PDFMINER_AVAILABLE = True
+except ImportError:
+    PDFMINER_AVAILABLE = False
 
 logger = logging.getLogger("smartroute.pipeline")
 logger.setLevel(logging.INFO)
@@ -142,6 +147,8 @@ def text_from_pdf_path(path: Path) -> str:
     """
     Extract text from PDF using pdfminer.
     """
+    if not PDFMINER_AVAILABLE:
+        raise RuntimeError("pdfminer not installed")
     text = pdfminer_extract_text(str(path)) or ""
     logger.info("PDF extractor used: pdfminer; extracted_chars=%s", len(text))
     return text.strip()

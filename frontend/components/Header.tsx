@@ -16,7 +16,7 @@ export default function Header() {
             Simulate
           </Link>
           <a
-            href="https://github.com/"
+            href="https://github.com/NickJuneau/gridstorm-smartroute"
             target="_blank"
             rel="noreferrer"
             className="rounded-md px-3 py-2 transition hover:bg-slate-100 hover:text-slate-900"

@@ -1,6 +1,5 @@
 "use client";
 
-import axios from "axios";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { AnalyzeResult } from "@/types/analyze";
@@ -86,11 +85,7 @@ export default function FileUploader({ onFileAnalyzed, onSelect, existingFile, o
     onDrop,
     multiple: false,
     disabled: uploading,
-    accept: {
-      "text/plain": [".txt"],
-      "application/pdf": [".pdf"],
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]
-    }
+    accept: { "application/octet-stream": [".txt", ".pdf", ".xlsx"] }
   });
 
   const fileTooLarge = Boolean(selectedFile && selectedFile.size > MAX_FILE_SIZE);
@@ -122,18 +117,18 @@ export default function FileUploader({ onFileAnalyzed, onSelect, existingFile, o
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await axios.post("/api/analyze-file", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        signal: abortRef.current.signal,
-        onUploadProgress: (event) => {
-          if (!event.total) {
-            return;
-          }
-          setProgress(Math.round((event.loaded / event.total) * 100));
-        }
+      setProgress(35);
+      const response = await fetch("/api/analyze-file", {
+        method: "POST",
+        body: formData,
+        signal: abortRef.current.signal
       });
-
-      const normalized = normalizeAnalyzeResult(response.data);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw { response: { status: response.status, data: payload } };
+      }
+      setProgress(90);
+      const normalized = normalizeAnalyzeResult(payload);
       onFileAnalyzed(normalized);
       onToast?.("File analyzed", "success");
       setProgress(100);
@@ -182,7 +177,7 @@ export default function FileUploader({ onFileAnalyzed, onSelect, existingFile, o
           isDragActive ? "border-primary bg-primary/5 text-primary" : "border-slate-300 bg-white text-slate-600"
         }`}
       >
-        <input id="file-upload-input" {...getInputProps()} aria-label="Upload file" />
+        <input id="file-upload-input" {...getInputProps({ accept: ".txt,.pdf,.xlsx" })} aria-label="Upload file" />
         <p>Drag and drop file here, or click to browse. Accepts .txt, .pdf, .xlsx (max 10MB)</p>
       </div>
 
