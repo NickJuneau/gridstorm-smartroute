@@ -18,26 +18,29 @@ function urgencyBadgeClass(urgency: string): string {
   return "bg-ok/15 text-ok";
 }
 
-function highlightKeywords(text: string, keywords: string[]): ReactNode {
-  if (!keywords.length || !text.trim()) {
-    return text;
+function highlightKeywords(text: string | undefined, keywords: string[] | undefined): ReactNode {
+  const safeText = String(text ?? "");
+  const safeKeywords = Array.isArray(keywords) ? keywords : [];
+
+  if (!safeKeywords.length || !safeText.trim()) {
+    return safeText;
   }
 
-  const escaped = keywords
+  const escaped = safeKeywords
     .filter((keyword) => keyword.trim().length > 0)
     .map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
   if (!escaped.length) {
-    return text;
+    return safeText;
   }
 
   const regex = new RegExp(`(${escaped.join("|")})`, "gi");
-  const chunks = text.split(regex);
+  const chunks = safeText.split(regex);
 
   return (
     <>
       {chunks.map((chunk, idx) => {
-        const isMatch = keywords.some((keyword) => keyword.toLowerCase() === chunk.toLowerCase());
+        const isMatch = safeKeywords.some((keyword) => keyword.toLowerCase() === chunk.toLowerCase());
         return isMatch ? (
           <mark key={`${chunk}-${idx}`} className="rounded bg-primary/20 px-1 text-slate-900">
             {chunk}
