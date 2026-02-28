@@ -17,6 +17,7 @@ export default function SimulatePage() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<SimulationResponse | null>(null);
+  const [demoUploadStatus, setDemoUploadStatus] = useState<string | null>(null);
 
   const rows = response?.results ?? [];
 
@@ -53,6 +54,33 @@ export default function SimulatePage() {
     }
   };
 
+  const runDemoPdfUpload = async () => {
+    setDemoUploadStatus("Uploading sample PDF...");
+    try {
+      const sample = await fetch("/samples/sample_pdf_text.pdf");
+      if (!sample.ok) {
+        throw new Error("Sample PDF not found in /public/samples.");
+      }
+      const blob = await sample.blob();
+      const file = new File([blob], "sample_pdf_text.pdf", { type: "application/pdf" });
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/analyze-file", {
+        method: "POST",
+        body: formData
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(String(payload?.detail ?? "Sample upload failed."));
+      }
+      setDemoUploadStatus("Sample PDF upload succeeded. Go back to Analyzer page to try full flow.");
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : "Sample PDF upload failed.";
+      setDemoUploadStatus(message);
+    }
+  };
+
   const downloadResultsCsv = () => {
     const csvRows = rows.map((row) => ({
       file: row.file,
@@ -77,16 +105,29 @@ export default function SimulatePage() {
             <p className="text-sm text-slate-600">Evaluate extraction and routing performance across sample files.</p>
           </div>
 
-          <button
-            type="button"
-            onClick={runSimulation}
-            disabled={isRunning}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isRunning ? <Spinner /> : null}
-            {isRunning ? "Running..." : "Run Simulation"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={runDemoPdfUpload}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              Demo PDF Upload
+            </button>
+            <button
+              type="button"
+              onClick={runSimulation}
+              disabled={isRunning}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isRunning ? <Spinner /> : null}
+              {isRunning ? "Running..." : "Run Simulation"}
+            </button>
+          </div>
         </div>
+
+        {demoUploadStatus ? (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{demoUploadStatus}</div>
+        ) : null}
 
         {error ? (
           <div className="mt-4 rounded-md border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">

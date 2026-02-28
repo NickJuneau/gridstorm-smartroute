@@ -1,9 +1,11 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
+import FileUploader from "@/components/FileUploader";
 import ResultCard from "@/components/ResultCard";
 import SampleSelector from "@/components/SampleSelector";
 import { AnalyzeApiError, AnalyzeResult } from "@/types/analyze";
+import { normalizeAnalyzeResult } from "@/utils/normalize";
 
 type HistoryItem = {
   id: string;
@@ -12,60 +14,22 @@ type HistoryItem = {
   createdAt: string;
 };
 
-function normalizeAnalyzeResult(payload: unknown): AnalyzeResult {
-  const source = (payload ?? {}) as Record<string, any>;
-  const extracted = (source.extracted ?? {}) as Record<string, any>;
-  const interpretation = (source.interpretation ?? {}) as Record<string, any>;
-  const routing = (source.routing ?? {}) as Record<string, any>;
-  const explainability = (source.explainability ?? {}) as Record<string, any>;
-  const metadata = (source.metadata ?? {}) as Record<string, any>;
-
-  return {
-    cleaned_text: String(source.cleaned_text ?? source.clean_text ?? ""),
-    extracted: {
-      pole_id: String(extracted.pole_id ?? ""),
-      address: String(extracted.address ?? ""),
-      inspector: String(extracted.inspector ?? ""),
-      phone: String(extracted.phone ?? ""),
-      email: String(extracted.email ?? ""),
-      issue_type: String(extracted.issue_type ?? extracted.inspection_type ?? ""),
-      details: String(extracted.details ?? extracted.notes ?? "")
-    },
-    interpretation: {
-      urgency: String(interpretation.urgency ?? "low") as AnalyzeResult["interpretation"]["urgency"],
-      action_required: String(interpretation.action_required ?? "Record for standard routing queue"),
-      confidence: Number(interpretation.confidence ?? 0)
-    },
-    routing: {
-      team: String(routing.team ?? "Field Services"),
-      method: String(routing.method ?? "field_queue"),
-      note: String(routing.note ?? "normal")
-    },
-    explainability: {
-      matched_keywords: Array.isArray(explainability.matched_keywords)
-        ? explainability.matched_keywords.map((v: unknown) => String(v))
-        : [],
-      ner_tokens: Array.isArray(explainability.ner_tokens)
-        ? explainability.ner_tokens.map((token: any) =>
-            typeof token === "string" ? token : String(token?.text ?? "")
-          )
-        : []
-    },
-    metadata: {
-      model: String(metadata.model ?? "unknown"),
-      processing_time_ms: Number(metadata.processing_time_ms ?? 0),
-      timestamp: String(metadata.timestamp ?? new Date(0).toISOString()),
-      source: String(metadata.source ?? "backend")
-    }
-  };
-}
-
 export default function HomePage() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  const appendHistory = (sourceText: string, data: AnalyzeResult) => {
+    const nextItem: HistoryItem = {
+      id: `${Date.now()}`,
+      text: sourceText,
+      result: data,
+      createdAt: new Date().toLocaleString()
+    };
+    setHistory((prev) => [nextItem, ...prev].slice(0, 5));
+  };
 
   const handleAnalyze = async (event: FormEvent) => {
     event.preventDefault();
@@ -96,15 +60,7 @@ export default function HomePage() {
 
       const data = normalizeAnalyzeResult(payload);
       setResult(data);
-
-      const nextItem: HistoryItem = {
-        id: `${Date.now()}`,
-        text,
-        result: data,
-        createdAt: new Date().toLocaleString()
-      };
-
-      setHistory((prev) => [nextItem, ...prev].slice(0, 5));
+      appendHistory(text, data);
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unexpected error during analysis.";
       setError(message);
@@ -120,7 +76,7 @@ export default function HomePage() {
     }
 
     if (file.type !== "text/plain" && !file.name.toLowerCase().endsWith(".txt")) {
-      setError("Only .txt files are supported.");
+      setError("Only .txt files are supported for direct textarea insert.");
       return;
     }
 
@@ -166,7 +122,7 @@ export default function HomePage() {
 
             <div className="rounded-lg border border-dashed border-slate-300 p-3">
               <label htmlFor="txt-upload" className="label-muted block">
-                Upload .txt (optional)
+                Quick .txt to textarea (optional)
               </label>
               <input
                 id="txt-upload"
@@ -176,6 +132,15 @@ export default function HomePage() {
                 className="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
               />
             </div>
+
+            <FileUploader
+              onError={(message) => setError(message || null)}
+              onSuccess={(uploadedResult, sourceLabel) => {
+                setResult(uploadedResult);
+                setError(null);
+                appendHistory(`[file] ${sourceLabel}`, uploadedResult);
+              }}
+            />
 
             <div className="flex flex-wrap gap-2">
               <button

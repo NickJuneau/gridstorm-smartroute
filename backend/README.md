@@ -6,6 +6,8 @@ FastAPI NLP service for SmartRoute with regex-first extraction and optional spaC
 
 - `POST /analyze` with body: `{"text":"<raw email>"}`  
   Returns structured output: `message_id`, `raw_text`, `clean_text`, `extracted`, `interpretation`, `routing`, `explainability`, `metadata`.
+- `POST /analyze-file` with multipart field `file` (`.txt`, `.pdf`, `.xlsx`, max 10MB)  
+  Extracts text from file and returns the same JSON contract as `/analyze`.
 - `GET /simulate`  
   Processes `app/data/mock_emails/*.txt` and optional `app/data/*.xlsx`, computes summary metrics and per-field accuracy when `app/data/labels.csv` exists.
 - `GET /health`  
@@ -45,6 +47,7 @@ Frontend expects backend at `http://localhost:8000`.
 - `BACKEND_HOST` (default: `0.0.0.0`)
 - `BACKEND_PORT` (default: `8000`)
 - `FALLBACK_MOCK` (`1` enables deterministic mock responses for `/analyze` and `/simulate`)
+  and `/analyze-file`.
 
 ## Tests
 
@@ -56,6 +59,25 @@ pytest -q
 
 ```bash
 docker compose up --build
+```
+
+## Optional: OCR for scanned PDFs
+
+OCR fallback is used only when PDF text extraction yields fewer than 120 characters.
+
+Windows:
+- Install Tesseract OCR and add it to your PATH.
+- Install Poppler binaries and add the `bin` folder to PATH (required by `pdf2image`).
+
+Linux:
+```bash
+sudo apt-get update
+sudo apt-get install -y tesseract-ocr poppler-utils
+```
+
+macOS:
+```bash
+brew install tesseract poppler
 ```
 
 ## Next Manual Steps Checklist

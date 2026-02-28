@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
-import os
 import re
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
+from pdfminer.high_level import extract_text as pdfminer_extract_text
 
 logger = logging.getLogger("smartroute.pipeline")
 logger.setLevel(logging.INFO)
@@ -118,6 +119,59 @@ def _normalize_key(key: str) -> str:
 
 def _normalize_str(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def text_from_excel_bytes(content: bytes) -> str:
+    """
+    Extract textual content from an .xlsx file represented as bytes.
+    """
+    frame = pd.read_excel(io.BytesIO(content), sheet_name=None)
+    lines: List[str] = []
+    for sheet_name, sheet_df in frame.items():
+        lines.append(f"[Sheet: {sheet_name}]")
+        for _, row in sheet_df.fillna("").iterrows():
+            row_values = [str(v).strip() for v in row.tolist() if str(v).strip()]
+            if row_values:
+                lines.append(" | ".join(row_values))
+    text = "\n".join(lines).strip()
+    logger.info("Excel extractor used; extracted_chars=%s", len(text))
+    return text
+
+
+def text_from_pdf_path(path: Path) -> str:
+    """
+    Extract text from PDF using pdfminer.
+    """
+    text = pdfminer_extract_text(str(path)) or ""
+    logger.info("PDF extractor used: pdfminer; extracted_chars=%s", len(text))
+    return text.strip()
+
+
+def ocr_pdf(path: Path) -> str:
+    """
+    Optional OCR fallback for scanned PDFs using pdf2image + pytesseract.
+    Returns empty string when dependencies are unavailable.
+    """
+    try:
+        from pdf2image import convert_from_path  # type: ignore
+        import pytesseract  # type: ignore
+    except Exception:
+        logger.info("OCR extractor unavailable: install pdf2image + pytesseract (+ poppler/tesseract binaries)")
+        return ""
+
+    try:
+        images = convert_from_path(str(path))
+        ocr_parts: List[str] = []
+        for image in images:
+            txt = pytesseract.image_to_string(image)
+            if txt and txt.strip():
+                ocr_parts.append(txt.strip())
+        text = "\n".join(ocr_parts).strip()
+        logger.info("PDF extractor used: OCR fallback; extracted_chars=%s", len(text))
+        return text
+    except Exception as exc:
+        logger.info("OCR extractor failed: %s", exc)
+        return ""
 
 
 def clean_text(raw: str) -> str:

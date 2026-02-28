@@ -1,8 +1,17 @@
 from pathlib import Path
+from io import BytesIO
 
+import pandas as pd
 import pytest
 
-from app.pipeline import clean_text, determine_urgency_and_action, extract_key_values
+from app.pipeline import (
+    clean_text,
+    determine_urgency_and_action,
+    extract_key_values,
+    ocr_pdf,
+    text_from_excel_bytes,
+    text_from_pdf_path,
+)
 
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "app" / "data" / "mock_emails"
@@ -53,3 +62,31 @@ def test_determine_urgency_medium_on_failed(sample_texts):
 def test_extract_phone_pattern(sample_texts):
     extracted = extract_key_values(clean_text(sample_texts["email12.txt"]))
     assert extracted["phone"] == "555-651-9001"
+
+
+def test_text_from_excel_bytes():
+    frame = pd.DataFrame(
+        {
+            "Permit": ["PMT-12345"],
+            "Address": ["45 Cedar Road"],
+            "Inspection Type": ["Electrical Safety Inspection"],
+        }
+    )
+    buffer = BytesIO()
+    frame.to_excel(buffer, index=False)
+    content = text_from_excel_bytes(buffer.getvalue())
+    assert "PMT-12345" in content
+    assert "45 Cedar Road" in content
+
+
+def test_text_from_pdf_path_reads_expected_token():
+    pdf_path = DATA_DIR / "sample_pdf_text.pdf"
+    content = text_from_pdf_path(pdf_path)
+    assert "SmartRoute PDF TOKEN" in content
+    assert "625296" in content
+
+
+def test_ocr_pdf_optional_dependency_behavior():
+    pdf_path = DATA_DIR / "sample_pdf_text.pdf"
+    ocr_text = ocr_pdf(pdf_path)
+    assert isinstance(ocr_text, str)

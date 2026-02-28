@@ -1,8 +1,10 @@
 import logging
 import os
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -10,6 +12,15 @@ from app import pipeline
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("smartroute.main")
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+ALLOWED_EXTENSIONS = {".txt", ".pdf", ".xlsx"}
+ALLOWED_CONTENT_TYPES = {
+    "text/plain",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",
+    "",
+}
 
 
 class AnalyzeRequest(BaseModel):
@@ -87,6 +98,7 @@ def _fallback_analyze(text: str) -> Dict[str, Any]:
             "model": "fallback-mock-v1",
             "spacy_enabled": False,
             "timestamp": "2026-01-01T00:00:00Z",
+            "file": None,
         },
     }
 
@@ -151,6 +163,104 @@ def analyze(payload: AnalyzeRequest) -> Dict[str, Any]:
     except Exception as exc:
         logger.exception("Unexpected failure while analyzing text")
         raise HTTPException(status_code=500, detail=f"Failed to analyze text: {exc}") from exc
+
+
+async def _read_upload_with_limit(file: UploadFile) -> bytes:
+    chunks: List[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 10MB limit")
+        chunks.append(chunk)
+    await file.seek(0)
+    return b"".join(chunks)
+
+
+def _extension(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    return suffix
+
+
+@app.post("/analyze-file", response_model=AnalyzeResponse)
+async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
+    file_name = file.filename or "upload"
+    ext = _extension(file_name)
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Unsupported file type. Allowed: .txt, .pdf, .xlsx.")
+    if (file.content_type or "") not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail=f"Unsupported content type: {file.content_type}")
+
+    try:
+        raw = await _read_upload_with_limit(file)
+        size_bytes = len(raw)
+        logger.info("analyze-file request: filename=%s size_bytes=%s content_type=%s", file_name, size_bytes, file.content_type)
+
+        if os.getenv("FALLBACK_MOCK") == "1":
+            mocked = _fallback_analyze(f"[mock upload] {file_name}")
+            mocked.setdefault("metadata", {})
+            mocked["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
+            return mocked
+
+        extracted_text = ""
+        if ext == ".txt":
+            try:
+                extracted_text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                extracted_text = raw.decode("cp1252", errors="ignore")
+            logger.info("File extractor used: txt")
+        elif ext == ".xlsx":
+            try:
+                extracted_text = pipeline.text_from_excel_bytes(raw)
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"Failed to parse Excel file: {exc}") from exc
+        elif ext == ".pdf":
+            temp_dir = tempfile.mkdtemp(prefix="smartroute_pdf_")
+            temp_path = Path(temp_dir) / "upload.pdf"
+            try:
+                temp_path.write_bytes(raw)
+                try:
+                    extracted_text = pipeline.text_from_pdf_path(temp_path)
+                except Exception as exc:
+                    logger.info("pdfminer extraction failed: %s", exc)
+                    extracted_text = ""
+                if len(extracted_text.strip()) < 120:
+                    ocr_text = pipeline.ocr_pdf(temp_path)
+                    if ocr_text.strip():
+                        extracted_text = ocr_text
+                    elif not extracted_text.strip():
+                        raise HTTPException(
+                            status_code=422,
+                            detail={
+                                "message": "Could not extract text from PDF. OCR fallback unavailable or failed.",
+                                "install_tesseract": True,
+                            },
+                        )
+            finally:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                try:
+                    Path(temp_dir).rmdir()
+                except Exception:
+                    pass
+
+        if not extracted_text.strip():
+            raise HTTPException(status_code=422, detail="Uploaded file did not contain extractable text.")
+
+        result = pipeline.analyze_text(extracted_text)
+        result.setdefault("metadata", {})
+        result["metadata"]["file"] = {"filename": file_name, "size_bytes": size_bytes}
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected failure while analyzing file upload")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze uploaded file: {exc}") from exc
 
 
 @app.get("/simulate", response_model=SimulateResponse)

@@ -1,0 +1,5 @@
+Permit Number: PMT-11122
+Site Address: 101 Main St
+Inspection Type: Electrical
+Result: Failed
+Notes: Live wire sparking near pole 625296
