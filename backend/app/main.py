@@ -1,6 +1,9 @@
 import logging
+import csv
+import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -41,6 +44,12 @@ class AnalyzeResponse(BaseModel):
 class SimulateResponse(BaseModel):
     summary: Dict[str, Any]
     results: List[Dict[str, Any]]
+
+
+class CorrectionRequest(BaseModel):
+    raw_text: str = Field(..., min_length=1)
+    corrected: Dict[str, Any]
+    source: str | None = "ui"
 
 
 app = FastAPI(title="SmartRoute NLP Backend", version="1.0.0")
@@ -185,6 +194,13 @@ def _extension(filename: str) -> str:
     return suffix
 
 
+def _corrections_csv_path() -> Path:
+    custom = os.getenv("CORRECTIONS_CSV_PATH")
+    if custom:
+        return Path(custom)
+    return Path(__file__).resolve().parent / "data" / "human_corrections.csv"
+
+
 @app.post("/analyze-file", response_model=AnalyzeResponse)
 async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     file_name = file.filename or "upload"
@@ -272,3 +288,33 @@ def simulate() -> Dict[str, Any]:
     except Exception as exc:
         logger.exception("Unexpected failure while running simulation")
         raise HTTPException(status_code=500, detail=f"Failed to run simulation: {exc}") from exc
+
+
+@app.post("/corrections")
+def corrections(payload: CorrectionRequest) -> Dict[str, bool]:
+    csv_path = _corrections_csv_path()
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = csv_path.exists()
+
+    try:
+        with open(csv_path, "a", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            if not file_exists:
+                writer.writerow(["timestamp", "filename_or_source", "raw_text", "corrected_json"])
+            writer.writerow(
+                [
+                    f"{time.time():.3f}",
+                    payload.source or "ui",
+                    payload.raw_text,
+                    json.dumps(payload.corrected, ensure_ascii=False),
+                ]
+            )
+        logger.info(
+            "Saved correction entry source=%s fields=%s",
+            payload.source or "ui",
+            ",".join(payload.corrected.keys()),
+        )
+        return {"ok": True}
+    except Exception as exc:
+        logger.exception("Failed to append correction")
+        raise HTTPException(status_code=500, detail=f"Failed to save correction: {exc}") from exc

@@ -1,9 +1,10 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import FileUploader from "@/components/FileUploader";
 import ResultCard from "@/components/ResultCard";
 import SampleSelector from "@/components/SampleSelector";
+import Toast from "@/components/Toast";
 import { AnalyzeApiError, AnalyzeResult } from "@/types/analyze";
 import { normalizeAnalyzeResult } from "@/utils/normalize";
 
@@ -14,29 +15,81 @@ type HistoryItem = {
   createdAt: string;
 };
 
+type ToastState = {
+  message: string;
+  type: "success" | "error";
+};
+
+const HISTORY_KEY = "smartroute-history-v1";
+
+function urgencyDotClass(urgency: string): string {
+  const value = urgency.toLowerCase();
+  if (value === "emergency") {
+    return "bg-danger";
+  }
+  if (value === "high") {
+    return "bg-orange-500";
+  }
+  if (value === "medium") {
+    return "bg-warn";
+  }
+  return "bg-ok";
+}
+
+function shortId(result: AnalyzeResult, fallbackId: string): string {
+  const raw = result.message_id || fallbackId;
+  return raw.slice(-6);
+}
+
 export default function HomePage() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(HISTORY_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as HistoryItem[];
+      if (Array.isArray(parsed)) {
+        setHistory(parsed.slice(0, 5));
+      }
+    } catch {
+      // Ignore localStorage parse failures.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 5)));
+  }, [history]);
 
   const appendHistory = (sourceText: string, data: AnalyzeResult) => {
-    const nextItem: HistoryItem = {
+    const item: HistoryItem = {
       id: `${Date.now()}`,
       text: sourceText,
       result: data,
       createdAt: new Date().toLocaleString()
     };
-    setHistory((prev) => [nextItem, ...prev].slice(0, 5));
+    setHistory((prev) => [item, ...prev].slice(0, 5));
+  };
+
+  const clearTransientError = () => {
+    setError(null);
   };
 
   const handleAnalyze = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
+    clearTransientError();
 
     if (!text.trim()) {
       setError("Please enter or upload email text before analyzing.");
+      setToast({ message: "Please enter text before analyzing.", type: "error" });
       return;
     }
 
@@ -52,18 +105,19 @@ export default function HomePage() {
       });
 
       const payload = (await response.json()) as AnalyzeResult | AnalyzeApiError;
-
       if (!response.ok) {
         const message = "error" in payload ? payload.error : "Unable to complete analysis right now.";
         throw new Error(message);
       }
 
-      const data = normalizeAnalyzeResult(payload);
-      setResult(data);
-      appendHistory(text, data);
+      const normalized = normalizeAnalyzeResult(payload);
+      setResult(normalized);
+      appendHistory(text, normalized);
+      setToast({ message: "Analysis complete", type: "success" });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unexpected error during analysis.";
       setError(message);
+      setToast({ message, type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -76,23 +130,42 @@ export default function HomePage() {
     }
 
     if (file.type !== "text/plain" && !file.name.toLowerCase().endsWith(".txt")) {
-      setError("Only .txt files are supported for direct textarea insert.");
+      const message = "Only .txt files are supported for direct textarea insert.";
+      setError(message);
+      setToast({ message, type: "error" });
       return;
     }
 
     const fileText = await file.text();
     setText(fileText);
-    setError(null);
+    clearTransientError();
   };
 
   const handleClear = () => {
     setText("");
     setResult(null);
-    setError(null);
+    clearTransientError();
   };
+
+  const historyPills = useMemo(
+    () =>
+      history.map((item) => {
+        const urgency = item.result.interpretation?.urgency ?? "low";
+        const route = item.result.routing?.team ?? "Field Services";
+        return {
+          ...item,
+          urgency,
+          route,
+          shortId: shortId(item.result, item.id)
+        };
+      }),
+    [history]
+  );
 
   return (
     <div className="space-y-6">
+      {toast ? <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} /> : null}
+
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">SmartRoute Analyzer</h1>
@@ -118,6 +191,25 @@ export default function HomePage() {
               Supports plain text field notes and copied email content.
             </p>
 
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                aria-label="Analyze text"
+                disabled={isLoading}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoading ? "Analyzing..." : "Analyze"}
+              </button>
+              <button
+                type="button"
+                aria-label="Clear analysis form"
+                onClick={handleClear}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                Clear
+              </button>
+            </div>
+
             <SampleSelector onInsert={setText} />
 
             <div className="rounded-lg border border-dashed border-slate-300 p-3">
@@ -134,30 +226,16 @@ export default function HomePage() {
             </div>
 
             <FileUploader
+              onSelect={setSelectedFile}
+              existingFile={selectedFile}
               onError={(message) => setError(message || null)}
-              onSuccess={(uploadedResult, sourceLabel) => {
+              onToast={(message, type = "success") => setToast({ message, type })}
+              onFileAnalyzed={(uploadedResult) => {
                 setResult(uploadedResult);
-                setError(null);
-                appendHistory(`[file] ${sourceLabel}`, uploadedResult);
+                clearTransientError();
+                appendHistory(uploadedResult.raw_text || "[uploaded file]", uploadedResult);
               }}
             />
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isLoading ? "Analyzing..." : "Analyze"}
-              </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-              >
-                Clear
-              </button>
-            </div>
           </form>
 
           {error ? (
@@ -167,34 +245,34 @@ export default function HomePage() {
           ) : null}
         </div>
 
-        <ResultCard result={result} />
+        <ResultCard result={result} onToast={(message, type = "success") => setToast({ message, type })} />
       </section>
 
       <section className="card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Recent History</h2>
-        <p className="mt-1 text-sm text-slate-500">Last 5 analyses. Click an item to repopulate the editor.</p>
+        <p className="mt-1 text-sm text-slate-500">Last 5 analyses. Click a pill to reload the result and input text.</p>
 
-        {history.length ? (
-          <ul className="mt-4 space-y-2">
-            {history.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setText(item.text);
-                    setResult(item.result);
-                    setError(null);
-                  }}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-primary/50 hover:bg-slate-50"
-                >
-                  <p className="truncate text-sm font-medium text-slate-800">{item.result.extracted.issue_type || "Unknown issue"}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    {item.result.extracted.pole_id || "No pole ID"} - {item.createdAt}
-                  </p>
-                </button>
-              </li>
+        {historyPills.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {historyPills.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={`Load history item ${item.shortId}`}
+                onClick={() => {
+                  setText(item.result.raw_text || item.text || "");
+                  setResult(item.result);
+                  clearTransientError();
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-primary/40 hover:bg-slate-50"
+              >
+                <span>{item.shortId}</span>
+                <span className={`h-2 w-2 rounded-full ${urgencyDotClass(item.urgency)}`} />
+                <span>{item.route}</span>
+                <span className="text-slate-500">{item.createdAt}</span>
+              </button>
             ))}
-          </ul>
+          </div>
         ) : (
           <p className="mt-4 text-sm text-slate-500">No analysis history yet.</p>
         )}
