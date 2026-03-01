@@ -8,6 +8,7 @@ export default function Header() {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-white">
             R
           </span>
+          
           <span className="text-lg font-semibold tracking-tight">RouteIQ</span>
         </Link>
 
