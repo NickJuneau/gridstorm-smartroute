@@ -186,7 +186,8 @@ export default function HomePage() {
 
             <SampleSelector onInsert={setText} />
 
-            <div className="rounded-lg border border-dashed border-slate-300 p-3">
+            {/* Removed for now. Not needed for CTO demo */}
+            {/* <div className="rounded-lg border border-dashed border-slate-300 p-3">
               <label htmlFor="txt-upload" className="label-muted block">Quick .txt to textarea (optional)</label>
               <input
                 id="txt-upload"
@@ -195,7 +196,8 @@ export default function HomePage() {
                 onChange={handleUploadText}
                 className="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
               />
-            </div>
+            </div> */}
+            
 
             <FileUploader
               onError={(message) => setError(message || null)}
