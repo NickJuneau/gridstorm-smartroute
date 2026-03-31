@@ -2,6 +2,33 @@
 
 FastAPI NLP service for SmartRoute with regex-first extraction and optional spaCy NER enrichment.
 
+## Quick Start (PowerShell)
+
+Backend:
+
+```powershell
+cd backend
+. .venv\Scripts\Activate.ps1
+py -3.13 -m pip install -r requirements.txt
+py -3.13 -m uvicorn app.main:app --reload --port 8000
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Backend tests:
+
+```powershell
+cd backend
+. .venv\Scripts\Activate.ps1
+py -3.13 -m pytest -q
+```
+
 ## Endpoints
 
 - `POST /analyze` with body: `{"text":"<raw email>"}`  
